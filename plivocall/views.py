@@ -4,7 +4,7 @@ from plivocall.models import Call,QuestionRatings,CDR
 import plivo
 import settings
 from django.db.models import *
-questions = {'0':'How you rate the movie','1':'Is Actor is good','2':'Director is good','3':'Herione is good', '4':'Songs is good'}
+questions = {'0':'How would you rate music composition','1':'How much you rate for story line','2':'How would you rate actors as per their character','3':'How would you rate for dialogs', '4':'How would you rate overall performance for the movie'}
 MAX_QUESTIONS = 5
 def  plivo_start(request):
     return render_to_response('plivo.html')
