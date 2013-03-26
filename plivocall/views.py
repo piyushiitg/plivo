@@ -3,17 +3,18 @@ from django.http import HttpResponse
 from plivocall.models import Call,QuestionRatings,CDR
 import plivo
 import settings
+from django.db.models import *
 questions = {'0':'How you rate the movie','1':'Is Actor is good','2':'Director is good','3':'Herione is good', '4':'Songs is good'}
-MAX_QUESTIONS = 1
+MAX_QUESTIONS = 5
 def  plivo_start(request):
     return render_to_response('plivo.html')
 
 def makecall(request):
     import plivo
     called = request.REQUEST.get('number','sip:piyush130322025614@phone.plivo.com')
-    movie = request.REQUEST.get('movie','Hangover')
-    auth_id = settings.auth_id #"MAYWY1NTG3M2YWOGU2NT"
-    auth_token = settings.auth_token #"NTAyNmU1NjcyNmIxNTA4YTYxYmMxYTMyNGQ5ZjUw"    
+    movie = str(request.REQUEST.get('movie','Hangover')).lower()
+    auth_id = "MAYWY1NTG3M2YWOGU2NT"
+    auth_token = "NTAyNmU1NjcyNmIxNTA4YTYxYmMxYTMyNGQ5ZjUw"    
     p = plivo.RestAPI(auth_id, auth_token)
     params = {
     'from': '1212121212', # Caller Id
@@ -58,7 +59,7 @@ def plivo_answer(request):
             qr = QuestionRatings.objects.get(call_uuid=call_uuid,question=qr_len-1)
             qr.rating = x2
             qr.save()
-        if qr_len <= MAX_QUESTIONS:
+        if qr_len < MAX_QUESTIONS:
             q = questions[str(qr_len)]
        
             x1 = '''<Response>
@@ -71,14 +72,7 @@ def plivo_answer(request):
             qr = QuestionRatings.objects.create(call_uuid=call_uuid,question=qr_len,rating=x2)
             response = x1
         else:
-            avg_rating = 0
-            qr = QuestionRatings.objects.filter(call_uuid=call_uuid)
-            for q1 in qr:
-                x = q1.rating
-                if x > 5:
-                    x = 5
-                avg_rating = avg_rating + q1.rating
-            avg_rating = avg_rating/5
+            avg_rating = calculate_rating(call_uuid)
             x2 = '''<Response>
               <Speak>Your Overall Rating is %s. Thank you</Speak>
               </Response>'''%str(avg_rating)
@@ -87,6 +81,18 @@ def plivo_answer(request):
     except:
         import traceback
         print traceback.format_exc()
+
+def calculate_rating(call_uuid):
+    avg_rating = 0
+    qr = QuestionRatings.objects.filter(call_uuid=call_uuid)
+    for q1 in qr:
+        x = q1.rating
+        if x > 5:
+            x = 5
+        avg_rating = avg_rating + q1.rating
+    avg_rating = avg_rating/MAX_QUESTIONS
+    print "*******************************************************",avg_rating
+    return avg_rating
 
 def plivo_hangup(request):
     call_uuid = request.REQUEST.get('CallUUID',None)
@@ -103,17 +109,26 @@ def plivo_hangup(request):
         if x > 5:
             x = 5
         avg_rating = avg_rating + q1.rating
-    avg_rating = avg_rating/5
+    avg_rating = avg_rating/qr.count()
     try:
+        response = "sucess"
         c = Call.objects.get(request_uuid=req_uuid)
         cdr = CDR.objects.create(call_uuid=call_uuid,BillDuration=BillDuration,From=From,HangupCause=HangupCause,To=To,CallStatus=CallStatus,avg_rating=avg_rating,movie=c.movie)
         c.delete() 
-        #return HttpResponse(response,content_type='application/xml')
+        return HttpResponse(response,content_type='application/xml')
     except:
         import traceback
         print traceback.format_exc()
 
 
 def plivo_ratings(request):
-    movie = request.REQUEST.get('movie','Hangover')
+    #moviename = request.REQUEST.get('movie','')
+    c = CDR.objects.all().values("movie").annotate(rat=Avg("avg_rating"))
+    print c
+    rating_dict = {}
+    for c1 in c:
+       rating_dict[c1['movie']] = c1['rat']
+    print rating_dict
+    return render_to_response('searchresults.html',{'rating_dict': rating_dict})
+
      

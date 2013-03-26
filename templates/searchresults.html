@@ -1,0 +1,10 @@
+<table>
+<tr>
+<th>Movie</th><th>Rating</th>
+</tr>
+{% for mov,rat in rating_dict.items %}
+<tr>
+<td>{{ mov }}</td><td>{{ rat }} </td>
+</tr>
+{% endfor %}
+</table>
