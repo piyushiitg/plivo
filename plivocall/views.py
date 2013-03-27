@@ -27,7 +27,6 @@ def makecall(request):
     }
     params['to'] = str(called)
     response = p.make_call(params)
-    print '#####################################',params
     status = response[0]
     result = response[1]
     if result.has_key('error'):
@@ -51,23 +50,24 @@ def makecall(request):
 def plivo_answer(request):
     x2 = request.REQUEST.get('Digits',0)
     call_uuid = request.REQUEST.get('CallUUID',None)
+    req_uuid = request.REQUEST.get('RequestUUID',None)
     try:
         qr = QuestionRatings.objects.filter(call_uuid=call_uuid)
-        print call_uuid,'*********************************************'
         qr_len = qr.count()
         if len(qr) != 0:
             qr = QuestionRatings.objects.get(call_uuid=call_uuid,question=qr_len-1)
             qr.rating = x2
             qr.save()
         if qr_len < MAX_QUESTIONS:
+            c = Call.objects.get(request_uuid=req_uuid)
             q = questions[str(qr_len)]
        
             x1 = '''<Response>
              <GetDigits action="http://54.251.117.109:9090/plivo/answer/" method="GET">
-             <Speak>%s, Press 5 for excellent and 1 for poor, followed by the hash key</Speak>
+             <Speak>For Movie %s , %s, Press 5 for excellent and 1 for poor, followed by the hash key</Speak>
              </GetDigits>
               <Speak>Input not received. Thank you</Speak>
-              </Response>'''%q
+              </Response>'''%(c.movie,q)
 
             qr = QuestionRatings.objects.create(call_uuid=call_uuid,question=qr_len,rating=x2)
             response = x1
@@ -91,7 +91,6 @@ def calculate_rating(call_uuid):
             x = 5
         avg_rating = avg_rating + q1.rating
     avg_rating = avg_rating/MAX_QUESTIONS
-    print "*******************************************************",avg_rating
     return avg_rating
 
 def plivo_hangup(request):
@@ -123,12 +122,10 @@ def plivo_hangup(request):
 
 def plivo_ratings(request):
     #moviename = request.REQUEST.get('movie','')
-    c = CDR.objects.all().values("movie").annotate(rat=Avg("avg_rating"))
-    print c
+    c = CDR.objects.filter(CallStatus='completed').values("movie").annotate(rat=Avg("avg_rating"))
     rating_dict = {}
     for c1 in c:
        rating_dict[c1['movie']] = c1['rat']
-    print rating_dict
     return render_to_response('searchresults.html',{'rating_dict': rating_dict})
 
      
